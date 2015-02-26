@@ -15,7 +15,8 @@ class AppController extends Controller {
                 'Form' => array(
                     'passwordHasher' => 'Blowfish'
                 )
-            )
+            ),
+            'authorize' => array('Controller')
         )
     );
 
@@ -31,5 +32,16 @@ class AppController extends Controller {
             $this->set('log_text', "Login");
             $this->set('log_url', array('controller' => 'users','action' => 'login'));
         }
+    }
+
+    public function isAuthorized($user) {
+        // Admin can access every action
+        if (isset($user['role']) && $user['role'] === 'admin') {
+            return true;
+        }
+
+        // Default deny
+        $this->Session->setFlash("You are not authorized to perform this action.");
+        return false;
     }
 }
