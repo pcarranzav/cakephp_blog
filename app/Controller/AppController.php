@@ -8,8 +8,8 @@ class AppController extends Controller {
                 'action' => 'index'
             ),
             'logoutRedirect' => array(
-                'controller' => 'pages',
-                'action' => 'display',
+                'controller' => 'posts',
+                'action' => 'index',
                 'home'
             ),
             'authenticate' => array(
@@ -22,5 +22,15 @@ class AppController extends Controller {
 
     public function beforeFilter() {
         $this->Auth->allow('index', 'view');
+
+        if($this->Auth->user()) {
+            $this->set('current_user',$this->Auth->user('username'));
+            $this->set('log_text', "Logout");
+            $this->set('log_url', array('controller' => 'users','action' => 'logout'));
+        }else{
+            $this->set('current_user','Not logged in');
+            $this->set('log_text', "Login");
+            $this->set('log_url', array('controller' => 'users','action' => 'login'));
+        }
     }
 }

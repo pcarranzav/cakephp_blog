@@ -742,3 +742,7 @@ pre {
 #url-rewriting-warning {
 	display:none;
 }
+
+.pull-right {
+  float: right!important;
+}

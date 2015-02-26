@@ -38,7 +38,10 @@ $cakeVersion = __d('cake_dev', 'CakePHP %s', Configure::version())
 <body>
 	<div id="container">
 		<div id="header">
-			<h1><?php echo $this->Html->link($cakeDescription, 'http://cakephp.org'); ?></h1>
+			<h1>This is a blog</h1>
+			<div class='pull-right'>
+				<h3><?php echo $current_user; ?> | <?php echo $this->Html->link($log_text,$log_url); ?></h3>
+			</div>
 		</div>
 		<div id="content">
 
