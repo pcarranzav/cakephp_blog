@@ -70,10 +70,25 @@ class UsersController extends AppController {
 
     public function login() {
         if ($this->request->is('post')) {
-            if ($this->Auth->login()) {
+            $username = $this->request->data['User']['username'];
+            $user = $this->User->findByUsername($username);
+            if($user == array()) {
+                $this->Session->setFlash(__('Invalid username or password, try again'));
+                return;
+            }
+
+            $authorized = $this->User->isAuthorizedForLogin($user);
+
+            if ($authorized && $this->Auth->login()) {
+                $this->User->clearLoginAttempts($user);
                 return $this->redirect($this->Auth->redirectUrl());
             }
-            $this->Session->setFlash(__('Invalid username or password, try again'));
+            $this->User->addLoginAttempt($user);
+            if($user && !$authorized){
+                $this->Session->setFlash(__('User blocked due to excessive login attempts. Please wait a few hours and try again.'));
+            }else{
+                $this->Session->setFlash(__('Invalid username or password, try again'));
+            } 
         }
     }
 

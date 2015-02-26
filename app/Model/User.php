@@ -1,6 +1,7 @@
 <?php
 App::uses('AppModel', 'Model');
 App::uses('BlowfishPasswordHasher', 'Controller/Component/Auth');
+App::uses('CakeTime', 'Utility');
 
 class User extends AppModel {
     public $validate = array(
@@ -37,5 +38,31 @@ class User extends AppModel {
             );
         }
         return true;
+    }
+
+    public function isAuthorizedForLogin($user) {
+
+        $attempts = $user['User']['num_login_attempts'];
+        $last_attempt = $user['User']['last_login_attempt'];
+
+        if(($attempts >= 3) && (CakeTime::wasWithinLast("2 hours", $last_attempt))) {
+            return false;
+        }
+
+        return true;
+    }
+
+    public function addLoginAttempt($user) {
+        $attempts = $user['User']['num_login_attempts'];
+        $attempts += 1;
+        $user['User']['num_login_attempts'] = $attempts;
+        $user['User']['last_login_attempt'] = DboSource::expression('NOW()');
+        $this->save($user,true,array('num_login_attempts','last_login_attempt'));
+    }
+
+    public function clearLoginAttempts($user) {
+        $user['User']['num_login_attempts'] = 0;
+
+        $this->save($user,true,array('num_login_attempts'));
     }
 }
