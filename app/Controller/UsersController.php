@@ -54,7 +54,7 @@ class UsersController extends AppController {
     }
 
     public function delete($id = null) {
-        $this->request->onlyAllow('post');
+        $this->request->allowMethod('post');
 
         $this->User->id = $id;
         if (!$this->User->exists()) {
