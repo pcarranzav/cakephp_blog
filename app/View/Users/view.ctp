@@ -1,3 +1,3 @@
-<h1><?php echo h($post['User']['username']); ?></h1>
+<h1><?php echo h($user['User']['username']); ?></h1>
 
-<p><small>Created: <?php echo $post['User']['created']; ?></small></p>
+<p><small>Created: <?php echo $user['User']['created']; ?></small></p>
