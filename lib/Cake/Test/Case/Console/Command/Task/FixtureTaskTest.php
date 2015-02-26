@@ -2,19 +2,18 @@
 /**
  * FixtureTask Test case
  *
- * PHP 5
- *
  * CakePHP(tm) : Rapid Development Framework (http://cakephp.org)
- * Copyright 2005-2011, Cake Software Foundation, Inc. (http://cakefoundation.org)
+ * Copyright (c) Cake Software Foundation, Inc. (http://cakefoundation.org)
  *
  * Licensed under The MIT License
+ * For full copyright and license information, please see the LICENSE.txt
  * Redistributions of files must retain the above copyright notice.
  *
- * @copyright     Copyright 2005-2011, Cake Software Foundation, Inc. (http://cakefoundation.org)
+ * @copyright     Copyright (c) Cake Software Foundation, Inc. (http://cakefoundation.org)
  * @link          http://cakephp.org CakePHP(tm) Project
  * @package       Cake.Test.Case.Console.Command.Task
  * @since         CakePHP(tm) v 1.3
- * @license       MIT License (http://www.opensource.org/licenses/mit-license.php)
+ * @license       http://www.opensource.org/licenses/mit-license.php MIT License
  */
 
 App::uses('ShellDispatcher', 'Console');
@@ -43,7 +42,7 @@ class FixtureTaskTest extends CakeTestCase {
 /**
  * Whether backup global state for each test method or not
  *
- * @var bool false
+ * @var bool
  */
 	public $backupGlobals = false;
 
@@ -90,7 +89,7 @@ class FixtureTaskTest extends CakeTestCase {
 		$in = $this->getMock('ConsoleInput', array(), array(), '', false);
 
 		$Task = new FixtureTask($out, $out, $in);
-		$this->assertEquals($Task->path, APP . 'Test' . DS . 'Fixture' . DS);
+		$this->assertEquals(APP . 'Test' . DS . 'Fixture' . DS, $Task->path);
 	}
 
 /**
@@ -119,6 +118,48 @@ class FixtureTaskTest extends CakeTestCase {
 
 		$result = $this->Task->importOptions('Article');
 		$expected = array();
+		$this->assertEquals($expected, $result);
+	}
+
+/**
+ * test importOptions with overwriting command line options.
+ *
+ * @return void
+ */
+	public function testImportOptionsWithCommandLineOptions() {
+		$this->Task->params = array('schema' => true, 'records' => true);
+
+		$result = $this->Task->importOptions('Article');
+		$expected = array('schema' => 'Article', 'records' => true);
+		$this->assertEquals($expected, $result);
+	}
+
+/**
+ * test importOptions with schema.
+ *
+ * @return void
+ */
+	public function testImportOptionsWithSchema() {
+		$this->Task->params = array('schema' => true);
+		$this->Task->expects($this->at(0))->method('in')->will($this->returnValue('n'));
+		$this->Task->expects($this->at(1))->method('in')->will($this->returnValue('n'));
+
+		$result = $this->Task->importOptions('Article');
+		$expected = array('schema' => 'Article');
+		$this->assertEquals($expected, $result);
+	}
+
+/**
+ * test importOptions with records.
+ *
+ * @return void
+ */
+	public function testImportOptionsWithRecords() {
+		$this->Task->params = array('records' => true);
+		$this->Task->expects($this->at(0))->method('in')->will($this->returnValue('n'));
+
+		$result = $this->Task->importOptions('Article');
+		$expected = array('records' => true);
 		$this->assertEquals($expected, $result);
 	}
 
@@ -177,7 +218,7 @@ class FixtureTaskTest extends CakeTestCase {
  *
  * @return void
  */
-	function testImportRecordsNoEscaping() {
+	public function testImportRecordsNoEscaping() {
 		$db = ConnectionManager::getDataSource('test');
 		if ($db instanceof Sqlserver) {
 			$this->markTestSkipped('This test does not run on SQLServer');
@@ -203,7 +244,6 @@ class FixtureTaskTest extends CakeTestCase {
 
 /**
  * test that execute passes runs bake depending with named model.
- *
  *
  * @return void
  */
@@ -266,6 +306,32 @@ class FixtureTaskTest extends CakeTestCase {
 		$filename = '/my/path/CommentFixture.php';
 		$this->Task->expects($this->at(1))->method('createFile')
 			->with($filename, $this->stringContains("'comment' => 'First Comment for First Article'"));
+		$this->Task->expects($this->exactly(2))->method('createFile');
+
+		$this->Task->all();
+	}
+
+/**
+ * test using all() with -schema
+ *
+ * @return void
+ */
+	public function testAllWithSchemaImport() {
+		$this->Task->connection = 'test';
+		$this->Task->path = '/my/path/';
+		$this->Task->args = array('all');
+		$this->Task->params = array('schema' => true);
+
+		$this->Task->Model->expects($this->any())->method('listAll')
+			->will($this->returnValue(array('Articles', 'comments')));
+
+		$filename = '/my/path/ArticleFixture.php';
+		$this->Task->expects($this->at(0))->method('createFile')
+			->with($filename, $this->stringContains('public $import = array(\'model\' => \'Article\''));
+
+		$filename = '/my/path/CommentFixture.php';
+		$this->Task->expects($this->at(1))->method('createFile')
+			->with($filename, $this->stringContains('public $import = array(\'model\' => \'Comment\''));
 		$this->Task->expects($this->exactly(2))->method('createFile');
 
 		$this->Task->all();
@@ -360,9 +426,8 @@ class FixtureTaskTest extends CakeTestCase {
 		$this->Task->expects($this->at(1))->method('createFile')
 			->with($filename, $this->stringContains('<?php'));
 
-		$result = $this->Task->generateFixtureFile('Article', array());
-
-		$result = $this->Task->generateFixtureFile('Article', array());
+		$this->Task->generateFixtureFile('Article', array());
+		$this->Task->generateFixtureFile('Article', array());
 	}
 
 /**
@@ -377,11 +442,11 @@ class FixtureTaskTest extends CakeTestCase {
 		$filename = APP . 'Plugin' . DS . 'TestFixture' . DS . 'Test' . DS . 'Fixture' . DS . 'ArticleFixture.php';
 
 		//fake plugin path
-		CakePlugin::load('TestFixture', array('path' =>  APP . 'Plugin' . DS . 'TestFixture' . DS));
+		CakePlugin::load('TestFixture', array('path' => APP . 'Plugin' . DS . 'TestFixture' . DS));
 		$this->Task->expects($this->at(0))->method('createFile')
 			->with($filename, $this->stringContains('class Article'));
 
-		$result = $this->Task->generateFixtureFile('Article', array());
+		$this->Task->generateFixtureFile('Article', array());
 		CakePlugin::unload();
 	}
 

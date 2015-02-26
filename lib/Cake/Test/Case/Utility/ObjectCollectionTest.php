@@ -2,46 +2,80 @@
 /**
  * ObjectCollectionTest file
  *
- * PHP 5
- *
  * CakePHP(tm) : Rapid Development Framework (http://cakephp.org)
- * Copyright 2005-2011, Cake Software Foundation, Inc. (http://cakefoundation.org)
+ * Copyright (c) Cake Software Foundation, Inc. (http://cakefoundation.org)
  *
  * Licensed under The MIT License
+ * For full copyright and license information, please see the LICENSE.txt
  * Redistributions of files must retain the above copyright notice.
  *
- * @copyright     Copyright 2005-2011, Cake Software Foundation, Inc. (http://cakefoundation.org)
- * @link          http://book.cakephp.org/view/1196/Testing CakePHP(tm) Tests
+ * @copyright     Copyright (c) Cake Software Foundation, Inc. (http://cakefoundation.org)
+ * @link          http://book.cakephp.org/2.0/en/development/testing.html CakePHP(tm) Tests
  * @package       Cake.Test.Case.Utility
  * @since         CakePHP(tm) v 2.0
- * @license       MIT License (http://www.opensource.org/licenses/mit-license.php)
+ * @license       http://www.opensource.org/licenses/mit-license.php MIT License
  */
 
 App::uses('ObjectCollection', 'Utility');
+App::uses('CakeEvent', 'Event');
 
 /**
  * A generic object class
  */
 class GenericObject {
+
+/**
+ * Constructor
+ *
+ * @param GenericObjectCollection $collection
+ * @param array $settings
+ */
+	public function __construct(GenericObjectCollection $collection, $settings = array()) {
+		$this->_Collection = $collection;
+		$this->settings = $settings;
+	}
+
 }
 
 /**
  * First Extension of Generic Object
  */
 class FirstGenericObject extends GenericObject {
+
 /**
  * A generic callback
+ *
+ * @return void
  */
 	public function callback() {
 	}
+
 }
 
 /**
  * Second Extension of Generic Object
  */
 class SecondGenericObject extends GenericObject {
+
+/**
+ * @return void
+ */
 	public function callback() {
 	}
+
+}
+
+/**
+ * Third Extension of Generic Object
+ */
+class ThirdGenericObject extends GenericObject {
+
+/**
+ * @return void
+ */
+	public function callback() {
+	}
+
 }
 
 /**
@@ -57,7 +91,7 @@ class GenericObjectCollection extends ObjectCollection {
  * @return array List of loaded objects
  */
 	public function load($object, $settings = array()) {
-		list($plugin, $name) = pluginSplit($object);
+		list(, $name) = pluginSplit($object);
 		if (isset($this->_loaded[$name])) {
 			return $this->_loaded[$name];
 		}
@@ -65,13 +99,36 @@ class GenericObjectCollection extends ObjectCollection {
 		$this->_loaded[$name] = new $objectClass($this, $settings);
 		$enable = isset($settings['enabled']) ? $settings['enabled'] : true;
 		if ($enable === true) {
-			$this->_enabled[] = $name;
+			$this->enable($name);
 		}
 		return $this->_loaded[$name];
 	}
+
+/**
+ * Helper method for adding/overwriting enabled objects including
+ * settings
+ *
+ * @param string $name Name of the object
+ * @param Object $object The object to use
+ * @param array $settings Settings to apply for the object
+ * @return array Loaded objects
+ */
+	public function setObject($name, $object, $settings = array()) {
+		$this->_loaded[$name] = $object;
+		if (isset($settings['priority'])) {
+			$this->setPriority($name, $settings['priority']);
+		}
+		$enable = isset($settings['enabled']) ? $settings['enabled'] : true;
+		if ($enable === true) {
+			$this->enable($name);
+		}
+		return $this->_loaded;
+	}
+
 }
 
 class ObjectCollectionTest extends CakeTestCase {
+
 /**
  * setUp
  *
@@ -88,8 +145,8 @@ class ObjectCollectionTest extends CakeTestCase {
  * @return void
  */
 	public function tearDown() {
-		unset($this->Objects);
 		parent::tearDown();
+		unset($this->Objects);
 	}
 
 /**
@@ -102,8 +159,8 @@ class ObjectCollectionTest extends CakeTestCase {
 		$this->assertInstanceOf('FirstGenericObject', $result);
 		$this->assertInstanceOf('FirstGenericObject', $this->Objects->First);
 
-		$result = $this->Objects->attached();
-		$this->assertEquals(array('First'), $result, 'attached() results are wrong.');
+		$result = $this->Objects->loaded();
+		$this->assertEquals(array('First'), $result, 'loaded() results are wrong.');
 
 		$this->assertTrue($this->Objects->enabled('First'));
 
@@ -120,17 +177,17 @@ class ObjectCollectionTest extends CakeTestCase {
 		$this->Objects->load('First');
 		$this->Objects->load('Second');
 
-		$result = $this->Objects->attached();
+		$result = $this->Objects->loaded();
 		$this->assertEquals(array('First', 'Second'), $result, 'loaded objects are wrong');
 
 		$this->Objects->unload('First');
 		$this->assertFalse(isset($this->Objects->First));
 		$this->assertTrue(isset($this->Objects->Second));
 
-		$result = $this->Objects->attached();
+		$result = $this->Objects->loaded();
 		$this->assertEquals(array('Second'), $result, 'loaded objects are wrong');
 
-		$result = $this->Objects->enabled();
+		$result = $this->Objects->loaded();
 		$this->assertEquals(array('Second'), $result, 'enabled objects are wrong');
 	}
 
@@ -142,16 +199,16 @@ class ObjectCollectionTest extends CakeTestCase {
 	public function testSet() {
 		$this->Objects->load('First');
 
-		$result = $this->Objects->attached();
+		$result = $this->Objects->loaded();
 		$this->assertEquals(array('First'), $result, 'loaded objects are wrong');
 
-		$result = $this->Objects->set('First', new SecondGenericObject());
+		$result = $this->Objects->set('First', new SecondGenericObject($this->Objects));
 		$this->assertInstanceOf('SecondGenericObject', $result['First'], 'set failed');
 
-		$result = $this->Objects->set('Second', new SecondGenericObject());
+		$result = $this->Objects->set('Second', new SecondGenericObject($this->Objects));
 		$this->assertInstanceOf('SecondGenericObject', $result['Second'], 'set failed');
 
-		$this->assertEquals(count($result), 2);
+		$this->assertEquals(2, count($result));
 	}
 
 /**
@@ -160,12 +217,9 @@ class ObjectCollectionTest extends CakeTestCase {
  * @return void
  */
 	protected function _makeMockClasses() {
-		if (!class_exists('TriggerMockFirstGenericObject')) {
-			$this->getMock('FirstGenericObject', array(), array(), 'TriggerMockFirstGenericObject', false);
-		}
-		if (!class_exists('TriggerMockSecondGenericObject')) {
-			$this->getMock('SecondGenericObject', array(), array(), 'TriggerMockSecondGenericObject', false);
-		}
+		$this->FirstGenericObject = $this->getMock('FirstGenericObject', array(), array(), '', false);
+		$this->SecondGenericObject = $this->getMock('SecondGenericObject', array(), array(), '', false);
+		$this->ThirdGenericObject = $this->getMock('ThirdGenericObject', array(), array(), '', false);
 	}
 
 /**
@@ -175,11 +229,8 @@ class ObjectCollectionTest extends CakeTestCase {
  */
 	public function testTrigger() {
 		$this->_makeMockClasses();
-		$this->Objects->load('TriggerMockFirst');
-		$this->Objects->load('TriggerMockSecond');
-
-		$this->mockObjects[] = $this->Objects->TriggerMockFirst;
-		$this->mockObjects[] = $this->Objects->TriggerMockSecond;
+		$this->Objects->setObject('TriggerMockFirst', $this->FirstGenericObject);
+		$this->Objects->setObject('TriggerMockSecond', $this->SecondGenericObject);
 
 		$this->Objects->TriggerMockFirst->expects($this->once())
 			->method('callback')
@@ -198,11 +249,8 @@ class ObjectCollectionTest extends CakeTestCase {
  */
 	public function testTriggerWithDisabledObjects() {
 		$this->_makeMockClasses();
-		$this->Objects->load('TriggerMockFirst');
-		$this->Objects->load('TriggerMockSecond');
-
-		$this->mockObjects[] = $this->Objects->TriggerMockFirst;
-		$this->mockObjects[] = $this->Objects->TriggerMockSecond;
+		$this->Objects->setObject('TriggerMockFirst', $this->FirstGenericObject);
+		$this->Objects->setObject('TriggerMockSecond', $this->SecondGenericObject, array('enabled' => false));
 
 		$this->Objects->TriggerMockFirst->expects($this->once())
 			->method('callback')
@@ -210,8 +258,6 @@ class ObjectCollectionTest extends CakeTestCase {
 		$this->Objects->TriggerMockSecond->expects($this->never())
 			->method('callback')
 			->will($this->returnValue(true));
-
-		$this->Objects->disable('TriggerMockSecond');
 
 		$this->assertTrue($this->Objects->trigger('callback', array()));
 	}
@@ -223,11 +269,8 @@ class ObjectCollectionTest extends CakeTestCase {
  */
 	public function testTriggerWithCollectReturn() {
 		$this->_makeMockClasses();
-		$this->Objects->load('TriggerMockFirst');
-		$this->Objects->load('TriggerMockSecond');
-
-		$this->mockObjects[] = $this->Objects->TriggerMockFirst;
-		$this->mockObjects[] = $this->Objects->TriggerMockSecond;
+		$this->Objects->setObject('TriggerMockFirst', $this->FirstGenericObject);
+		$this->Objects->setObject('TriggerMockSecond', $this->SecondGenericObject);
 
 		$this->Objects->TriggerMockFirst->expects($this->once())
 			->method('callback')
@@ -251,11 +294,8 @@ class ObjectCollectionTest extends CakeTestCase {
  */
 	public function testTriggerWithBreak() {
 		$this->_makeMockClasses();
-		$this->Objects->load('TriggerMockFirst');
-		$this->Objects->load('TriggerMockSecond');
-
-		$this->mockObjects[] = $this->Objects->TriggerMockFirst;
-		$this->mockObjects[] = $this->Objects->TriggerMockSecond;
+		$this->Objects->setObject('TriggerMockFirst', $this->FirstGenericObject);
+		$this->Objects->setObject('TriggerMockSecond', $this->SecondGenericObject);
 
 		$this->Objects->TriggerMockFirst->expects($this->once())
 			->method('callback')
@@ -278,11 +318,8 @@ class ObjectCollectionTest extends CakeTestCase {
  */
 	public function testTriggerWithModParams() {
 		$this->_makeMockClasses();
-		$this->Objects->load('TriggerMockFirst');
-		$this->Objects->load('TriggerMockSecond');
-
-		$this->mockObjects[] = $this->Objects->TriggerMockFirst;
-		$this->mockObjects[] = $this->Objects->TriggerMockSecond;
+		$this->Objects->setObject('TriggerMockFirst', $this->FirstGenericObject);
+		$this->Objects->setObject('TriggerMockSecond', $this->SecondGenericObject);
 
 		$this->Objects->TriggerMockFirst->expects($this->once())
 			->method('callback')
@@ -310,11 +347,8 @@ class ObjectCollectionTest extends CakeTestCase {
  */
 	public function testTriggerModParamsInvalidIndex() {
 		$this->_makeMockClasses();
-		$this->Objects->load('TriggerMockFirst');
-		$this->Objects->load('TriggerMockSecond');
-
-		$this->mockObjects[] = $this->Objects->TriggerMockFirst;
-		$this->mockObjects[] = $this->Objects->TriggerMockSecond;
+		$this->Objects->setObject('TriggerMockFirst', $this->FirstGenericObject);
+		$this->Objects->setObject('TriggerMockSecond', $this->SecondGenericObject);
 
 		$this->Objects->TriggerMockFirst->expects($this->never())
 			->method('callback');
@@ -322,7 +356,7 @@ class ObjectCollectionTest extends CakeTestCase {
 		$this->Objects->TriggerMockSecond->expects($this->never())
 			->method('callback');
 
-		$result = $this->Objects->trigger(
+		$this->Objects->trigger(
 			'callback',
 			array(array('value')),
 			array('modParams' => 2)
@@ -330,17 +364,14 @@ class ObjectCollectionTest extends CakeTestCase {
 	}
 
 /**
- * test that returrning null doesn't modify parameters.
+ * test that returning null doesn't modify parameters.
  *
  * @return void
  */
 	public function testTriggerModParamsNullIgnored() {
 		$this->_makeMockClasses();
-		$this->Objects->load('TriggerMockFirst');
-		$this->Objects->load('TriggerMockSecond');
-
-		$this->mockObjects[] = $this->Objects->TriggerMockFirst;
-		$this->mockObjects[] = $this->Objects->TriggerMockSecond;
+		$this->Objects->setObject('TriggerMockFirst', $this->FirstGenericObject);
+		$this->Objects->setObject('TriggerMockSecond', $this->SecondGenericObject);
 
 		$this->Objects->TriggerMockFirst->expects($this->once())
 			->method('callback')
@@ -358,6 +389,114 @@ class ObjectCollectionTest extends CakeTestCase {
 			array('modParams' => 0)
 		);
 		$this->assertEquals(array('new value'), $result);
+	}
+
+/**
+ * test order of callbacks triggering based on priority.
+ *
+ * @return void
+ */
+	public function testTriggerPriority() {
+		$this->_makeMockClasses();
+		$this->Objects->setObject('TriggerMockFirst', $this->FirstGenericObject);
+		$this->Objects->setObject('TriggerMockSecond', $this->SecondGenericObject, array('priority' => 5));
+
+		$this->Objects->TriggerMockFirst->expects($this->any())
+			->method('callback')
+			->will($this->returnValue('1st'));
+		$this->Objects->TriggerMockSecond->expects($this->any())
+			->method('callback')
+			->will($this->returnValue('2nd'));
+
+		$result = $this->Objects->trigger('callback', array(), array('collectReturn' => true));
+		$expected = array(
+			'2nd',
+			'1st'
+		);
+		$this->assertEquals($expected, $result);
+
+		$this->Objects->setObject('TriggerMockThird', $this->ThirdGenericObject, array('priority' => 7));
+		$this->Objects->TriggerMockThird->expects($this->any())
+			->method('callback')
+			->will($this->returnValue('3rd'));
+
+		$result = $this->Objects->trigger('callback', array(), array('collectReturn' => true));
+		$expected = array(
+			'2nd',
+			'3rd',
+			'1st'
+		);
+		$this->assertEquals($expected, $result);
+
+		$this->Objects->disable('TriggerMockFirst');
+		$result = $this->Objects->trigger('callback', array(), array('collectReturn' => true));
+		$expected = array(
+			'2nd',
+			'3rd'
+		);
+		$this->assertEquals($expected, $result);
+
+		$this->Objects->enable('TriggerMockFirst');
+		$result = $this->Objects->trigger('callback', array(), array('collectReturn' => true));
+		$expected = array(
+			'2nd',
+			'3rd',
+			'1st'
+		);
+		$this->assertEquals($expected, $result);
+
+		$this->Objects->disable('TriggerMockThird');
+		$result = $this->Objects->trigger('callback', array(), array('collectReturn' => true));
+		$expected = array(
+			'2nd',
+			'1st'
+		);
+		$this->assertEquals($expected, $result);
+
+		$this->Objects->enable('TriggerMockThird', false);
+		$result = $this->Objects->trigger('callback', array(), array('collectReturn' => true));
+		$expected = array(
+			'2nd',
+			'1st',
+			'3rd'
+		);
+		$this->assertEquals($expected, $result);
+
+		$this->Objects->setPriority('TriggerMockThird', 1);
+		$result = $this->Objects->trigger('callback', array(), array('collectReturn' => true));
+		$expected = array(
+			'3rd',
+			'2nd',
+			'1st'
+		);
+		$this->assertEquals($expected, $result);
+
+		$this->Objects->disable('TriggerMockThird');
+		$this->Objects->setPriority('TriggerMockThird', 11);
+		$result = $this->Objects->trigger('callback', array(), array('collectReturn' => true));
+		$expected = array(
+			'2nd',
+			'1st'
+		);
+		$this->assertEquals($expected, $result);
+
+		$this->Objects->enable('TriggerMockThird');
+		$result = $this->Objects->trigger('callback', array(), array('collectReturn' => true));
+		$expected = array(
+			'2nd',
+			'1st',
+			'3rd'
+		);
+		$this->assertEquals($expected, $result);
+
+		$this->Objects->setPriority('TriggerMockThird');
+		$result = $this->Objects->trigger('callback', array(), array('collectReturn' => true));
+		$expected = array(
+			'2nd',
+			'1st',
+			'3rd'
+		);
+		$this->assertEquals($expected, $result);
 	}
 
 /**
@@ -390,6 +529,58 @@ class ObjectCollectionTest extends CakeTestCase {
 		);
 		$result = ObjectCollection::normalizeObjectArray($components);
 		$this->assertEquals($expected, $result);
+	}
+
+/**
+ * tests that passing an instance of CakeEvent to trigger will prepend the subject to the list of arguments
+ *
+ * @return void
+ * @triggers callback $subjectClass, array('first argument')
+ */
+	public function testDispatchEventWithSubject() {
+		$this->_makeMockClasses();
+		$this->Objects->setObject('TriggerMockFirst', $this->FirstGenericObject);
+		$this->Objects->setObject('TriggerMockSecond', $this->SecondGenericObject);
+
+		$subjectClass = new Object();
+		$this->Objects->TriggerMockFirst->expects($this->once())
+			->method('callback')
+			->with($subjectClass, 'first argument')
+			->will($this->returnValue(true));
+		$this->Objects->TriggerMockSecond->expects($this->once())
+			->method('callback')
+			->with($subjectClass, 'first argument')
+			->will($this->returnValue(true));
+
+		$event = new CakeEvent('callback', $subjectClass, array('first argument'));
+		$this->assertTrue($this->Objects->trigger($event));
+	}
+
+/**
+ * tests that passing an instance of CakeEvent to trigger with omitSubject property
+ * will NOT prepend the subject to the list of arguments
+ *
+ * @return void
+ * @triggers callback $subjectClass, array('first argument')
+ */
+	public function testDispatchEventNoSubject() {
+		$this->_makeMockClasses();
+		$this->Objects->setObject('TriggerMockFirst', $this->FirstGenericObject);
+		$this->Objects->setObject('TriggerMockSecond', $this->SecondGenericObject);
+
+		$subjectClass = new Object();
+		$this->Objects->TriggerMockFirst->expects($this->once())
+			->method('callback')
+			->with('first argument')
+			->will($this->returnValue(true));
+		$this->Objects->TriggerMockSecond->expects($this->once())
+			->method('callback')
+			->with('first argument')
+			->will($this->returnValue(true));
+
+		$event = new CakeEvent('callback', $subjectClass, array('first argument'));
+		$event->omitSubject = true;
+		$this->assertTrue($this->Objects->trigger($event));
 	}
 
 }
